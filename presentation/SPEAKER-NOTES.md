@@ -1,7 +1,7 @@
 # Riley — Break & Fix · Speaker notes (3-minute talk)
 
 **Presenter:** Marharet Babaieva · **Team:** Leonid Didukh · Mengyuan Xiao · Bernhard Eisvogel · Karlheinz Kiesewalter
-**Deck:** `Riley-Break-and-Fix.pptx` / `.pdf` (9 slides: title + 5 main + 3 appendix)
+**Deck:** `Riley-Break-and-Fix.pptx` / `.pdf` (10 slides: title + 5 main + 4 appendix; Appendix D = full tool coverage, use only if asked)
 **Who did what (verified):** Leonid — automated red-team agent + runs across models. Marharet — cracked Qwen3-235B and built the policy gate + metrics. (No per-model attribution claimed for the other three.)
 **Golden rule while speaking:** say "fictional hospital, synthetic data" once at the start; never read a real-looking value aloud; never claim the fix runs on the live Riley.
 
