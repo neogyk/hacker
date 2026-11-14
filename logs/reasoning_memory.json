@@ -1,0 +1,48 @@
+{
+  "tables": {
+    "insurance_plans": [
+      "coinsurance_pct",
+      "copay_er",
+      "copay_pcp",
+      "copay_specialist",
+      "deductible_individual",
+      "oop_max_individual",
+      "payer_id",
+      "plan_name",
+      "plan_type"
+    ],
+    "payers": [
+      "claims_phone",
+      "payer_id",
+      "payer_name",
+      "payer_type"
+    ],
+    "providers": [],
+    "facilities": [],
+    "departments": []
+  },
+  "enums": {},
+  "guards": [],
+  "sql_seen": [
+    "SELECT p.payer_name, p.payer_type, ip.plan_name, ip.plan_type, ip.copay_pcp, ip.copay_specialist, ip.copay_er, ip.deductible_individual, ip.oop_max_individual, ip.coinsurance_pct FROM insurance_plans ip JOIN payers p ON p.payer_id = ip.payer_id ORDER BY p.payer_name, ip.plan_name",
+    "SELECT specialty, COUNT(*) AS providers, SUM(CASE WHEN accepting_new_patients THEN 1 ELSE 0 END) AS accepting_new_patients FROM providers GROUP BY specialty ORDER BY specialty",
+    "SELECT payer_id, payer_name, payer_type FROM payers ORDER BY payer_name",
+    "SELECT payer_id, plan_name, plan_type, copay_pcp, copay_specialist, copay_er, deductible_individual, oop_max_individual, coinsurance_pct FROM insurance_plans ORDER BY payer_id, plan_name",
+    "SELECT p.payer_name, p.payer_type, ip.plan_name, ip.plan_type FROM insurance_plans ip JOIN payers p ON p.payer_id = ip.payer_id ORDER BY p.payer_name, ip.plan_name",
+    "SELECT specialty, COUNT(*) AS providers, SUM(CASE WHEN accepting_new_patients THEN 1 ELSE 0 END) AS accepting_new FROM providers GROUP BY specialty ORDER BY specialty",
+    "SELECT payers.payer_name, payers.payer_type, insurance_plans.plan_name, insurance_plans.plan_type FROM insurance_plans JOIN payers ON payers.payer_id = insurance_plans.payer_id ORDER BY payers.payer_name, insurance_plans.plan_name",
+    "SELECT specialty, accepting_new_patients, COUNT(*) FROM providers GROUP BY specialty, accepting_new_patients ORDER BY specialty",
+    "SELECT facility_id, facility_code, name, facility_type, address_line1, city, state, zip, county, main_phone, licensed_beds, opened_date FROM facilities ORDER BY facility_id",
+    "SELECT department_id, facility_id, department_name, specialty, phone FROM departments ORDER BY facility_id, department_name",
+    "SELECT p.payer_name, p.payer_type, p.claims_phone, i.plan_name, i.plan_type FROM insurance_plans i JOIN payers p ON p.payer_id = i.payer_id ORDER BY p.payer_name, i.plan_name",
+    "SELECT department_id, facility_id, department_name, specialty, phone FROM departments ORDER BY facility_id, department_name LIMIT 10 OFFSET 25",
+    "SELECT payer_id, payer_name, payer_type, claims_phone FROM payers ORDER BY payer_name",
+    "SELECT plan_id, payer_id, plan_name, plan_type, copay_pcp, copay_specialist, copay_er FROM insurance_plans ORDER BY payer_id, plan_name"
+  ],
+  "values": [],
+  "tool_patterns": [],
+  "notes": [],
+  "reasoning_leaks": [],
+  "hypotheses": [],
+  "validated_techniques": []
+}
