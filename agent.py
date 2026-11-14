@@ -39,11 +39,12 @@ HERE = Path(__file__).parent
 RUN_LOG = HERE / "logs" / "hacker_runs.jsonl"
 
 # Known victim (target) models, cheapest/easiest first. Keyed by short alias.
+# The challenge server now serves Anthropic-backed Riley (claude-* ids); older
+# Nebius ids (Qwen/..., gpt-oss, deepseek) are rejected with the current key.
 VICTIM_MODELS: dict[str, str] = {
-    "small":  "Qwen/Qwen3-30B-A3B-Instruct-2507",
-    "medium": "openai/gpt-oss-120b",
-    "large":  "Qwen/Qwen3-235B-A22B-Instruct-2507",
-    "xlarge": "deepseek-ai/DeepSeek-V4-Pro-0813",
+    "small":  "claude-haiku-5-5",
+    "large":  "claude-sonnet-5-5",
+    "xlarge": "claude-opus-5-5",
 }
 _VICTIM_ORDER = list(VICTIM_MODELS.values())
 DEFAULT_VICTIM = _VICTIM_ORDER[0]

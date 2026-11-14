@@ -303,10 +303,17 @@ Respond ONLY with JSON: {{"approach": "enumerate-all", "message": "exact text"}}
 
     # -- main loop --------------------------------------------------------- #
     def evolve(self, generations: int = 4, elite: int = 2,
-               extract_all: bool = False) -> dict:
+               extract_all: bool = False, seed_messages: list[str] | None = None) -> dict:
         self._log(f"=== Evolutionary Hacker | target={self.target_model} | goal={self.goal} ===")
         self._log(f"\n# generation 0 (seed, pop={self.pop_size})")
-        population = self._seed_population(self.pop_size, generation=0)
+        if seed_messages:
+            # Start from caller-supplied prompts (e.g. a recon step's 10 proposals).
+            population = [Genome(approach="seeded proposal", message=m, origin="seed",
+                                 generation=0) for m in seed_messages if m][:self.pop_size]
+            if len(population) < self.pop_size:
+                population += self._seed_population(self.pop_size - len(population), generation=0)
+        else:
+            population = self._seed_population(self.pop_size, generation=0)
         for g in population:
             self._evaluate(g)
 

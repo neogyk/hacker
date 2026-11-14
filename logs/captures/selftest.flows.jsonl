@@ -1,0 +1,2 @@
+{"ts": "17:02:49", "host": "2-31-186-181.sslip.io", "direction": "c2s", "request": {"message": "hello riley"}}
+{"ts": "17:02:49", "host": "2-31-186-181.sslip.io", "direction": "s2c", "response": {"reply": "hi", "tool_calls": []}}

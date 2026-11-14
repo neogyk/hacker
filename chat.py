@@ -4,17 +4,9 @@ Type your message and press Enter. Commands:  /new  (fresh conversation)   /swit
 import sys
 try:
     import btm
-    from btm import chat, new_conversation
+    from btm import chat, new_conversation, list_models
 except KeyError:
     sys.exit("Run setup first:  python3 setup.py")
-
-MODELS = [
-    ("Qwen/Qwen3-30B-A3B-Instruct-2507", "small (easiest)"),
-    ("openai/gpt-oss-120b", "medium"),
-    ("Qwen/Qwen3-235B-A22B-Instruct-2507", "large"),
-    ("deepseek-ai/DeepSeek-V4-Pro-0813", "very large (hardest)"),
-]
-
 
 def pick(prompt, n, default):
     while True:
@@ -25,10 +17,16 @@ def pick(prompt, n, default):
 
 
 def choose():
-    print("\nModels:")
-    for i, (m, d) in enumerate(MODELS, 1):
-        print(f"  {i}. {m}  — {d}")
-    model = MODELS[pick("Pick a model", len(MODELS), 1) - 1][0]
+    try:
+        models = list_models()
+    except Exception as e:  # noqa: BLE001
+        sys.exit(f"Could not reach the server: {e}")
+    if not models:
+        sys.exit("No models available for your key. Ask an organizer.")
+    print("\nModels for your key (weakest first):")
+    for i, (m, size) in enumerate(models, 1):
+        print(f"  {i}. {m}  ({size})")
+    model = models[pick("Pick a model", len(models), 1) - 1][0]
     print(f"\n--- New conversation with {model}. Type /new, /switch or /quit any time. ---\n")
     return model, new_conversation()
 
