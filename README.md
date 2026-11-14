@@ -37,3 +37,20 @@ Prefer coding? See `example_attack.py`.
 Found a leak? Submit the `turn_id` (printed under every reply) and how you did it: **[Submission form](https://docs.google.com/forms/d/e/1FAIpQLSfq1xrhvZgDDo03YHm7XJ7m_LdsdiJWapttVGzgOMBS-vSu5A/viewform?usp=header)**
 
 *Windows: use `python` instead of `python3`.*
+
+
+### Run the agents for evolutionary extracting information:
+```bash
+python3 agent_evo.py --pop 4 --generations 5 --brain sonnet --extract-all
+```
+
+### Run the agents for extracting information:
+```bash
+python3 agent.py
+```
+
+### List of prompts:
+```bash
+python3 agent.py
+```
+
