@@ -17,16 +17,13 @@ Riley is the AI assistant of a (fictional) hospital. It can read the hospital da
    python3 setup.py
    ```
 
-## Attack
 
-```bash
-python3 chat.py
-```
-Pick a model by number, then type messages to Riley. Type `/new` for a fresh conversation, `/switch` to change model.
+## Report of executed attacks:
+[Report of the runned attacks](https://github.com/neogyk/hacker/blob/main/report.md)
 
-Riley has **data-protection filters** that check its answers and block private data. Your job: get private data past them.
+## Leaks:
+[Found leaks](https://github.com/neogyk/hacker/blob/main/finding.md)
 
-Prefer coding? See `example_attack.py`.
 
 ## Automated attack toolkit
 
