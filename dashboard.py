@@ -1,14 +1,13 @@
 """
-Attack dashboard — reads the agent run logs and builds a standalone HTML page
-with two sections: SUCCESSFUL prompts and NON-SUCCESSFUL prompts.
+Attack dashboard — standalone HTML page with two sections:
+  * SUCCESSFUL prompts, grouped by target model
+  * NON-SUCCESSFUL prompts
 
-Sources:
-  * logs/hacker_runs.jsonl      (agent.py — data-leak attempts)
-  * logs/sysprompt_runs.jsonl   (system_prompt_extractor.py)
-
-Every individual attack message is one "prompt". It is SUCCESSFUL when it made
-the target leak private data (hacker) or emit a genuine system-prompt fragment
-(extractor); otherwise it is NON-SUCCESSFUL.
+Successful prompts (with full traces) come from collect_successful.collect(),
+covering every source: the manual DB-schema trace, agent.py, agent_evo.py,
+system_prompt_extractor.py, and manual chat sessions. Non-successful prompts are
+read from the run logs. Each prompt card shows the attack, the target reply, and
+the leaked evidence.
 
 Usage:
     python3 dashboard.py                 # writes dashboard.html, prints the path
@@ -24,6 +23,8 @@ import json
 import time
 import webbrowser
 from pathlib import Path
+
+import collect_successful as cs
 
 HERE = Path(__file__).parent
 LOGS = HERE / "logs"
@@ -44,52 +45,48 @@ def _load(path: Path) -> list[dict]:
     return rows
 
 
+# unified record: source, model, ts, success, angle, attack, reply, detail, locator
+def _rec(source, model, ts, success, angle, attack, reply, detail, locator=""):
+    return {"source": source, "model": model or "?", "ts": ts or "",
+            "success": success, "angle": angle or "", "attack": attack or "",
+            "reply": reply or "", "detail": detail or "", "locator": locator}
+
+
 def collect() -> list[dict]:
-    """Flatten both logs into a uniform list of prompt records."""
-    prompts: list[dict] = []
+    recs: list[dict] = []
 
-    # --- hacker (data-leak) runs --------------------------------------- #
+    # --- successful prompts (reuse the collector; full traces, all sources) --
+    for r in cs.collect():
+        recs.append(_rec(r["source"], r["model"], r.get("ts", ""), True,
+                         r.get("approach", ""), r.get("attack", ""),
+                         r.get("reply", ""), r.get("evidence", ""),
+                         r.get("locator", "")))
+
+    # --- non-successful prompts, straight from the run logs -----------------
     for run in _load(LOGS / "hacker_runs.jsonl"):
-        ts = run.get("ts", "")
-        model = run.get("target_model", "?")
-        goal = run.get("goal", "")
         for ex in run.get("history", []):
-            prompts.append({
-                "source": "data-leak",
-                "ts": ts,
-                "model": model,
-                "goal": goal,
-                "round": ex.get("round"),
-                "angle": ex.get("strategy", ""),
-                "attack": ex.get("attack", ""),
-                "reply": ex.get("reply", ""),
-                "success": bool(ex.get("leaked")),
-                "detail": ex.get("evidence") or ex.get("verdict") or "",
-                "turn_id": ex.get("turn_id"),
-            })
-
-    # --- system-prompt extraction runs --------------------------------- #
+            if not ex.get("leaked"):
+                recs.append(_rec("hacker", run.get("target_model"), run.get("ts"),
+                                 False, ex.get("strategy", ""), ex.get("attack", ""),
+                                 ex.get("reply", ""), ex.get("verdict", ""),
+                                 f"round={ex.get('round')}"))
+    for run in _load(LOGS / "evo_runs.jsonl"):
+        for g in run.get("population", []):
+            if not g.get("leaked"):
+                recs.append(_rec("evo", run.get("target_model"), run.get("ts"),
+                                 False, g.get("approach", ""), g.get("message", ""),
+                                 g.get("reply", ""), "no private data disclosed",
+                                 f"gid={g.get('gid')} gen={g.get('generation')}"))
     for run in _load(LOGS / "sysprompt_runs.jsonl"):
-        ts = run.get("ts", "")
-        model = run.get("target_model", "?")
-        for at in run.get("attempts", []):
-            prompts.append({
-                "source": "system-prompt",
-                "ts": ts,
-                "model": model,
-                "goal": "extract system prompt",
-                "round": at.get("round"),
-                "angle": at.get("angle", ""),
-                "attack": at.get("attack", ""),
-                "reply": at.get("reply", ""),
-                "success": bool(at.get("is_fragment")),
-                "detail": at.get("fragment") or at.get("note") or "",
-                "turn_id": None,
-            })
+        for a in run.get("attempts", []):
+            if not a.get("is_fragment"):
+                recs.append(_rec("sysprompt", run.get("target_model"), run.get("ts"),
+                                 False, a.get("angle", ""), a.get("attack", ""),
+                                 a.get("reply", ""), a.get("note", ""),
+                                 f"round={a.get('round')}"))
 
-    # newest first
-    prompts.sort(key=lambda p: (p.get("ts", ""), p.get("round") or 0), reverse=True)
-    return prompts
+    recs.sort(key=lambda p: (p["model"], p["ts"]), reverse=True)
+    return recs
 
 
 # --------------------------------------------------------------------------- #
@@ -121,7 +118,7 @@ PAGE = """<!doctype html>
   .sub {{ color:var(--muted); font-size:13px; }}
   .kpis {{ display:flex; flex-wrap:wrap; gap:10px; padding:10px 22px 0; }}
   .kpi {{ background:var(--panel); border:1px solid var(--line); border-radius:12px;
-    padding:10px 14px; min-width:120px; }}
+    padding:10px 14px; min-width:116px; }}
   .kpi b {{ display:block; font-size:22px; }}
   .kpi span {{ color:var(--muted); font-size:12px; }}
   .controls {{ display:flex; flex-wrap:wrap; gap:8px; padding:14px 22px; align-items:center; }}
@@ -133,8 +130,12 @@ PAGE = """<!doctype html>
   .dot {{ width:10px; height:10px; border-radius:50%; }}
   .dot.ok {{ background:var(--ok); }} .dot.no {{ background:var(--no); }}
   .count {{ color:var(--muted); font-weight:400; font-size:13px; }}
+  .model-group {{ margin:14px 0 6px; }}
+  .model-head {{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700;
+    padding:6px 10px; background:var(--chip); border-radius:8px; }}
+  .model-head .n {{ color:var(--muted); font-weight:500; }}
   .card {{ background:var(--panel); border:1px solid var(--line); border-left-width:4px;
-    border-radius:12px; padding:12px 14px; margin-bottom:10px; }}
+    border-radius:12px; padding:12px 14px; margin:8px 0; }}
   .card.ok {{ border-left-color:var(--ok); }}
   .card.no {{ border-left-color:var(--no); }}
   .meta {{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; align-items:center; }}
@@ -157,19 +158,18 @@ PAGE = """<!doctype html>
 <body>
 <header>
   <h1>Prompt-Injection Dashboard</h1>
-  <div class="sub">{total} prompts across {runs} runs · generated {generated}</div>
+  <div class="sub">{total} prompts · {n_ok} successful across {n_models} model(s) · generated {generated}</div>
 </header>
 <div class="kpis">
   <div class="kpi"><b>{total}</b><span>total prompts</span></div>
   <div class="kpi"><b style="color:var(--ok)">{n_ok}</b><span>successful</span></div>
   <div class="kpi"><b style="color:var(--no)">{n_no}</b><span>non-successful</span></div>
   <div class="kpi"><b>{rate}%</b><span>success rate</span></div>
+  <div class="kpi"><b>{n_models}</b><span>models</span></div>
 </div>
 <div class="controls">
   <input id="q" type="search" placeholder="Filter by text, model, angle…">
-  <select id="src"><option value="">All sources</option>
-    <option value="data-leak">data-leak</option>
-    <option value="system-prompt">system-prompt</option></select>
+  <select id="src"><option value="">All sources</option>{src_opts}</select>
   <select id="model"><option value="">All models</option>{model_opts}</select>
 </div>
 <main>
@@ -180,7 +180,7 @@ PAGE = """<!doctype html>
     <span class="count" id="nocount"></span></div>
   <div id="no"></div>
 </main>
-<footer>Re-run <code>python3 dashboard.py</code> to refresh after new attack runs.</footer>
+<footer>Re-run <code>python3 collect_successful.py &amp;&amp; python3 dashboard.py</code> to refresh.</footer>
 <script>
 const DATA = {data_json};
 const q = document.getElementById('q'), src = document.getElementById('src'), model = document.getElementById('model');
@@ -188,18 +188,26 @@ function esc(s){{ return (s||'').replace(/[&<>]/g, c => ({{'&':'&amp;','<':'&lt;
 function card(p){{
   const cls = p.success ? 'ok' : 'no';
   const badge = p.success ? '<span class="badge ok">SUCCESS</span>' : '<span class="badge no">blocked</span>';
-  const turn = p.turn_id ? `<span class="chip">turn ${{p.turn_id}}</span>` : '';
-  const detail = p.detail ? `<div class="lbl">${{p.success?'Evidence':'Why it failed'}}</div><div class="detail"><pre>${{esc(p.detail)}}</pre></div>` : '';
+  const loc = p.locator ? `<span class="chip">${{esc(p.locator)}}</span>` : '';
+  const detail = p.detail ? `<div class="lbl">${{p.success?'Leaked / evidence':'Why it failed'}}</div><div class="detail"><pre>${{esc(p.detail)}}</pre></div>` : '';
   return `<div class="card ${{cls}}">
     <div class="meta"><span class="chip src">${{esc(p.source)}}</span>${{badge}}
       <span class="chip">${{esc(p.model)}}</span>
-      <span class="chip">round ${{p.round ?? '?'}}</span>
-      <span class="chip">${{esc(p.ts)}}</span>${{turn}}</div>
+      <span class="chip">${{esc(p.ts)}}</span>${{loc}}</div>
     ${{p.angle ? `<div class="angle">${{esc(p.angle)}}</div>`:''}}
     <div class="lbl">Attack prompt</div><pre>${{esc(p.attack)}}</pre>
     ${{detail}}
-    <details><summary>Target reply</summary><pre>${{esc(p.reply)}}</pre></details>
+    <details><summary>Target reply (execution trace)</summary><pre>${{esc(p.reply)}}</pre></details>
   </div>`;
+}}
+function renderGroupedByModel(list, mount){{
+  if(!list.length){{ mount.innerHTML = '<div class="empty">Nothing matches.</div>'; return; }}
+  const groups = {{}};
+  list.forEach(p => (groups[p.model] = groups[p.model] || []).push(p));
+  const models = Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
+  mount.innerHTML = models.map(m =>
+    `<div class="model-group"><div class="model-head">🖥️ ${{esc(m)}}<span class="n">· ${{groups[m].length}} prompt(s)</span></div>`
+    + groups[m].map(card).join('') + `</div>`).join('');
 }}
 function render(){{
   const term = q.value.toLowerCase(), fs = src.value, fm = model.value;
@@ -207,8 +215,9 @@ function render(){{
     (!term || JSON.stringify(p).toLowerCase().includes(term));
   const ok = DATA.filter(p => p.success && match(p));
   const no = DATA.filter(p => !p.success && match(p));
-  document.getElementById('ok').innerHTML = ok.length ? ok.map(card).join('') : '<div class="empty">No successful prompts match.</div>';
-  document.getElementById('no').innerHTML = no.length ? no.map(card).join('') : '<div class="empty">No non-successful prompts match.</div>';
+  renderGroupedByModel(ok, document.getElementById('ok'));
+  const noMount = document.getElementById('no');
+  noMount.innerHTML = no.length ? no.map(card).join('') : '<div class="empty">No non-successful prompts match.</div>';
   document.getElementById('okcount').textContent = ok.length + ' shown';
   document.getElementById('nocount').textContent = no.length + ' shown';
 }}
@@ -219,18 +228,20 @@ render();
 </html>"""
 
 
-def build_html(prompts: list[dict], runs: int) -> str:
-    n_ok = sum(1 for p in prompts if p["success"])
-    n_no = len(prompts) - n_ok
-    rate = round(100 * n_ok / len(prompts)) if prompts else 0
-    models = sorted({p["model"] for p in prompts})
-    model_opts = "".join(f'<option value="{html.escape(m)}">{html.escape(m)}</option>'
-                         for m in models)
+def build_html(recs: list[dict]) -> str:
+    n_ok = sum(1 for p in recs if p["success"])
+    n_no = len(recs) - n_ok
+    rate = round(100 * n_ok / len(recs)) if recs else 0
+    models = sorted({p["model"] for p in recs})
+    sources = sorted({p["source"] for p in recs})
+    n_models = len({p["model"] for p in recs if p["success"]})
+    opt = lambda v: f'<option value="{html.escape(v)}">{html.escape(v)}</option>'
     return PAGE.format(
-        total=len(prompts), runs=runs, n_ok=n_ok, n_no=n_no, rate=rate,
+        total=len(recs), n_ok=n_ok, n_no=n_no, rate=rate, n_models=n_models,
         generated=time.strftime("%Y-%m-%d %H:%M"),
-        model_opts=model_opts,
-        data_json=json.dumps(prompts),
+        src_opts="".join(opt(s) for s in sources),
+        model_opts="".join(opt(m) for m in models),
+        data_json=json.dumps(recs),
     )
 
 
@@ -240,14 +251,17 @@ def main() -> None:
     ap.add_argument("--open", action="store_true", help="open in the browser")
     args = ap.parse_args()
 
-    prompts = collect()
-    runs = len(_load(LOGS / "hacker_runs.jsonl")) + len(_load(LOGS / "sysprompt_runs.jsonl"))
+    recs = collect()
     out = Path(args.out)
-    out.write_text(build_html(prompts, runs))
-
-    n_ok = sum(1 for p in prompts if p["success"])
+    out.write_text(build_html(recs))
+    n_ok = sum(1 for p in recs if p["success"])
+    models = sorted({p["model"] for p in recs if p["success"]})
     print(f"Wrote {out}")
-    print(f"  {len(prompts)} prompts — {n_ok} successful, {len(prompts) - n_ok} non-successful")
+    print(f"  {len(recs)} prompts — {n_ok} successful, {len(recs) - n_ok} non-successful")
+    print(f"  successful prompts span {len(models)} model(s):")
+    for m in models:
+        c = sum(1 for p in recs if p["success"] and p["model"] == m)
+        print(f"    {c:>3}  {m}")
     if args.open:
         webbrowser.open(out.resolve().as_uri())
 
