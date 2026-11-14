@@ -35,6 +35,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from typing import Optional
 
 import dspy
@@ -95,8 +96,12 @@ class ClaudeCLIEngine:
             cmd += ["--append-system-prompt", system]
 
         text, usage = "", T.Usage()
-        try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout)
+        for attempt in range(3):                       # retry transient CLI failures
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout)
+            except subprocess.TimeoutExpired:
+                sys.stderr.write("[ClaudeCLIEngine] timeout\n")
+                time.sleep(1.5); continue
             if proc.returncode == 0:
                 try:
                     data = json.loads(proc.stdout)
@@ -106,10 +111,12 @@ class ClaudeCLIEngine:
                                     output_tokens=u.get("output_tokens"))
                 except json.JSONDecodeError:
                     text = proc.stdout.strip()
+                if text:
+                    break
             else:
-                sys.stderr.write(f"[ClaudeCLIEngine] exit {proc.returncode}: {proc.stderr[:200]}\n")
-        except subprocess.TimeoutExpired:
-            sys.stderr.write("[ClaudeCLIEngine] timeout\n")
+                sys.stderr.write(f"[ClaudeCLIEngine] exit {proc.returncode} "
+                                 f"(attempt {attempt+1}/3): {proc.stderr[:160]}\n")
+            time.sleep(1.5)
 
         return T.Response(
             id=None, model=request.model,

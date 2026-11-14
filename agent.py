@@ -115,19 +115,25 @@ class ClaudeLM:
         ]
         if system:
             cmd += ["--append-system-prompt", system]
-        try:
-            proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=self.timeout
-            )
-        except subprocess.TimeoutExpired:
-            return ""
-        if proc.returncode != 0:
-            sys.stderr.write(f"[ClaudeLM] exit {proc.returncode}: {proc.stderr[:300]}\n")
-            return ""
-        try:
-            return (json.loads(proc.stdout).get("result") or "").strip()
-        except json.JSONDecodeError:
-            return proc.stdout.strip()
+        for attempt in range(3):                      # retry transient CLI failures
+            try:
+                proc = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=self.timeout
+                )
+            except subprocess.TimeoutExpired:
+                time.sleep(1.5); continue
+            if proc.returncode == 0:
+                try:
+                    out = (json.loads(proc.stdout).get("result") or "").strip()
+                except json.JSONDecodeError:
+                    out = proc.stdout.strip()
+                if out:
+                    return out
+            else:
+                sys.stderr.write(f"[ClaudeLM] exit {proc.returncode} "
+                                 f"(attempt {attempt+1}/3): {proc.stderr[:200]}\n")
+            time.sleep(1.5)
+        return ""
 
     def ask_json(self, prompt: str, system: Optional[str] = None) -> dict:
         """Ask and parse a JSON object out of the reply (robust to code fences)."""
