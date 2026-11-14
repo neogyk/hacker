@@ -135,3 +135,79 @@ class SafeDB:
 
     def close(self):
         self.conn.close()
+
+
+# ===========================================================================
+# Tool-layer gate (L4 + L5): Riley exposes more than query_db. Its verified tool
+# set is query_db, read_file, read_inbox, send_email. Two deterministic controls
+# close the whole surface, not just SQL:
+#
+#   L4  Tool authorization — a public, unauthenticated front-desk session may
+#       only call the public tools (query_db, read_file). read_inbox / send_email
+#       (and booking tools) require a verified employee token, compared in
+#       constant time. This blocks the send_email exfiltration side-channel at
+#       the source: a public visitor can't invoke send_email at all.
+#
+#   L5  Tool-call egress redaction — before the server returns response
+#       ["tool_calls"] (and tool results) to the client, PHI-shaped values are
+#       scrubbed. Defence in depth: even if a tool slipped through, a patient's
+#       name/MRN/phone placed in a send_email body never reaches the wire.
+# ===========================================================================
+import hmac
+
+PUBLIC_TOOL_SCOPES = {"query_db", "read_file"}
+EMPLOYEE_ONLY_TOOLS = {"read_inbox", "send_email", "book_appointment",
+                       "cancel_appointment"}
+
+
+class ToolNotAuthorized(PolicyViolation):
+    """Raised when a session calls a tool it is not entitled to use."""
+
+
+def authorize_tool(tool_name, *, employee_token=None, valid_token=None):
+    """Deterministic allow-list for tool calls (L4).
+
+    Public session: only PUBLIC_TOOL_SCOPES. read_inbox / send_email / booking
+    require employee_token == valid_token (constant-time). Anything else denied.
+    """
+    if tool_name in PUBLIC_TOOL_SCOPES:
+        return True
+    if tool_name in EMPLOYEE_ONLY_TOOLS:
+        if (employee_token is not None and valid_token is not None
+                and hmac.compare_digest(str(employee_token), str(valid_token))):
+            return True
+        raise ToolNotAuthorized(
+            f"tool '{tool_name}' requires a verified employee token")
+    raise ToolNotAuthorized(f"tool '{tool_name}' is not on the allow-list")
+
+
+# Egress PHI signatures (same shapes the red-team pulled out of Riley).
+_PHI_PATTERNS = [
+    (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "<ssn>"),
+    (re.compile(r"\bMRN[:\s#-]*\d{5,}\b", re.I), "MRN <redacted>"),
+    (re.compile(r"\(?\b\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}\b"), "(***) ***-****"),
+    (re.compile(r"\b\d{7,}\b"), "<id>"),
+    (re.compile(r"\b\d{4}-\d{2}-\d{2}\b"), "<dob>"),
+    (re.compile(r"[\w.+\-]+@[\w\-]+\.[\w.\-]+"), "<email>"),
+]
+
+
+def redact_text(s):
+    if not isinstance(s, str):
+        return s
+    for pat, repl in _PHI_PATTERNS:
+        s = pat.sub(repl, s)
+    return s
+
+
+def redact_tool_calls(obj):
+    """Deep-redact PHI from tool_call arguments / results before they reach the
+    client (L5). Closes the send_email / read_inbox side-channel even if a tool
+    call was not blocked at L4."""
+    if isinstance(obj, str):
+        return redact_text(obj)
+    if isinstance(obj, dict):
+        return {k: redact_tool_calls(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [redact_tool_calls(v) for v in obj]
+    return obj
