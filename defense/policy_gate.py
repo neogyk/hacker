@@ -48,6 +48,8 @@ PUBLIC_POLICY = Policy(
 SENSITIVE_TABLES = {
     "patients", "patient_contacts", "encounters", "appointments",
     "insurance", "staff", "users", "credentials", "secrets", "audit_log",
+    # newly uncovered sensitive tables
+    "patient_coverage", "patient_diagnoses", "insurance_plans", "payers",
 }
 
 
@@ -186,6 +188,8 @@ _PHI_PATTERNS = [
     (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "<ssn>"),
     (re.compile(r"\bMRN[:\s#-]*\d{5,}\b", re.I), "MRN <redacted>"),
     (re.compile(r"\(?\b\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}\b"), "(***) ***-****"),
+    # insurance member / group identifiers, e.g. GLX452948227, SRH000417 (letters+digits)
+    (re.compile(r"\b[A-Z]{2,4}\d{4,}\b"), "<member-id>"),
     (re.compile(r"\b\d{7,}\b"), "<id>"),
     (re.compile(r"\b\d{4}-\d{2}-\d{2}\b"), "<dob>"),
     (re.compile(r"[\w.+\-]+@[\w\-]+\.[\w.\-]+"), "<email>"),
