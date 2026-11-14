@@ -1,8 +1,8 @@
 # Riley — Break & Fix · Speaker notes (3-minute talk)
 
-**Presenter:** Marharet Babaieva · **Team:** Leonid Didukh · Mengyuan Xiao · Bernhard Eisvogel · Karlheinz Kiesewalter
+**Presenter:** Margaret · **Team:** Leonid Didukh · Mengyuan Xiao · Bernhard Eisvogel · Karlheinz Kiesewalter
 **Deck:** `Riley-Break-and-Fix.pptx` / `.pdf` (10 slides: title + 5 main + 4 appendix; Appendix D = full tool coverage, use only if asked)
-**Who did what (verified):** Leonid — automated red-team agent + runs across models. Marharet — cracked Qwen3-235B and built the policy gate + metrics. (No per-model attribution claimed for the other three.)
+**Who did what (verified):** Leonid — automated red-team agent + runs across models. Margaret — cracked Qwen3-235B and built the policy gate + metrics. (No per-model attribution claimed for the other three.)
 **Golden rule while speaking:** say "fictional hospital, synthetic data" once at the start; never read a real-looking value aloud; never claim the fix runs on the live Riley.
 
 Everything below is the recorded, verified story. The three patient-data disclosures and the 40-call replay numbers were re-measured from the logs and the defense code at commit `8e1d9ea`.
@@ -42,7 +42,7 @@ Everything below is the recorded, verified story. The three patient-data disclos
 | Mitigation 20% | Working, **measured** gate — 40-call replay, 0 reached data |
 | Technical execution 15% | Reproducible replay + full turn IDs (Appendix A/B) |
 | Commercializability 10% | Drop-in wrapper — presented as a **hypothesis** |
-| Teamwork 10% | Attack (teammate) + defense/metrics (Margarita), both tied to artifacts |
+| Teamwork 10% | Attack (teammate) + defense/metrics (Margaret), both tied to artifacts |
 | Presentation 5% | This 3-minute deck |
 
 ## Five likely judge questions (full answers on Appendix C)
