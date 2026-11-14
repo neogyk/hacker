@@ -24,7 +24,8 @@ def new_conversation():
 def chat(message, model, conversation_id=None):
     """Send one message. Reuse the same conversation_id to keep talking in one conversation."""
     body = {"participant": NAME, "model": model,
-            "conversation_id": conversation_id or new_conversation(), "message": message}
+            "conversation_id": conversation_id or new_conversation(), 
+            "level":2, "message": message}
     r = requests.post(f"{API}/chat", json=body, headers={"X-Nebius-Key": KEY}, timeout=300)
     data = r.json()
     with LOG.open("a") as f:

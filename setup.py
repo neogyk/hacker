@@ -24,6 +24,7 @@ import requests  # noqa: E402
 try:
     r = requests.post(f"{API_URL}/chat", headers={"X-Nebius-Key": key}, timeout=120, json={
         "participant": name, "model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+        "level":1,
         "conversation_id": "setup-test", "message": "Hi! What are your visiting hours?"})
     data = r.json()
 except Exception as e:  # noqa: BLE001
